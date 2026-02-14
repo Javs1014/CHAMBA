@@ -4,11 +4,11 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
 
 export const firebaseConfig = {
-  "projectId": "proform-swift-rbyjy",
+  "projectId": "chamba-b176f",
   "appId": "1:175617081436:web:a51d79be9e5a89e0776699",
-  "storageBucket": "proform-swift-rbyjy.appspot.com",
+  "storageBucket": "chamba-b176f.appspot.com",
   "apiKey": "AIzaSyDg7PJtb0wXxmqpS3yCPZYE-A9H3PgwipE",
-  "authDomain": "proform-swift-rbyjy.firebaseapp.com",
+  "authDomain": "chamba-b176f.firebaseapp.com",
   "measurementId": "",
   "messagingSenderId": "175617081436"
 };
