@@ -47,7 +47,8 @@ export default function StatsPage() {
         draftAmount,
         proformasByClient,
         treBalance,
-        stBalance
+        stBalance,
+        draftProformas // <-- Añadido para poder usar el arreglo en la vista
     };
   }, [proformas]);
 
@@ -82,7 +83,8 @@ export default function StatsPage() {
     )
   }
   
-  const { totalProformas, approvedProformasCount, draftProformasCount, totalBilledAmount, draftAmount, proformasByClient, treBalance, stBalance } = stats;
+  // Extraemos draftProformas de stats
+  const { totalProformas, approvedProformasCount, draftProformasCount, totalBilledAmount, draftAmount, proformasByClient, treBalance, stBalance, draftProformas } = stats;
 
   return (
     <div>
@@ -175,6 +177,44 @@ export default function StatsPage() {
                     </TableBody>
                 </Table>
             </div>
+        </CardContent>
+      </Card>
+
+      {/* NUEVA SECCIÓN: Resumen de Proformas en Draft */}
+      <Card className="mb-8 shadow-lg border-dashed border-2">
+        <CardHeader>
+          <CardTitle>Draft Proformas Summary</CardTitle>
+          <CardDescription>Resumen de las proformas que aún se encuentran en estado borrador (Draft).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Proforma #</TableHead>
+                <TableHead>Client</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {draftProformas.length > 0 ? (
+                draftProformas.map((proforma) => (
+                  <TableRow key={proforma.id}>
+                    <TableCell className="font-medium">{proforma.proformaNumber}</TableCell>
+                    <TableCell>{proforma.clientName}</TableCell>
+                    <TableCell>{proforma.company}</TableCell>
+                    <TableCell className="text-right">${proforma.grandTotal.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    No hay proformas en estado Draft actualmente.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
