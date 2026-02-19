@@ -1,4 +1,3 @@
-
 'use client';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -252,11 +251,12 @@ export default function PackingListPage() {
                 </div>
               </div>
 
+              {/* AQUÍ ESTÁ LA SECCIÓN DE EDICIÓN DE CONTENEDORES CORREGIDA */}
               <div className="space-y-4">
                 <CardTitle>Container Details</CardTitle>
                 {fields.map((field, index) => (
-                  <Card key={field.id} className="p-4">
-                     <div className="grid grid-cols-2 gap-4">
+                  <Card key={field.id} className="p-4 bg-slate-50 border-slate-200">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                        <div>
                           <Label>Container #{index + 1}</Label>
                           <Input {...form.register(`editedContainers.${index}.containerNumber`)} placeholder="Container Number" />

@@ -1,6 +1,5 @@
-
 'use client'
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useProducts } from '@/hooks/use-products';
 import { useClients } from '@/hooks/use-clients';
 import { useProforma, useUpdateProforma } from '@/hooks/use-proformas';
-import type { ProformaItem, Product, Client, Proforma } from '@/types';
+import type { ProformaItem, Product, Proforma } from '@/types';
 import { PlusCircle, Trash2, Save, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -138,26 +137,33 @@ export default function EditProformaPage() {
   const taxAmount = subTotal * watchedTaxRate;
   const grandTotal = subTotal + taxAmount;
 
+   // Lógica para actualizar dirección SOLO si cambia el cliente manualmente
+   // Evita sobrescribir datos al cargar la página si ya existen
    useEffect(() => {
     if (watchedClientId && clients) { 
-      const client = clients.find(c => c.id === watchedClientId);
-      if (client) {
-        form.setValue('clientAddress', client.address || '');
-        form.setValue('clientTaxId', client.taxId || '');
-        form.setValue('customerSignatoryName', client.companyName || client.name);
-        
-        if(!form.getValues('shipToClientId') || form.getValues('shipToClientId') === watchedClientId) {
-            form.setValue('shipToClientId', client.id);
-            form.setValue('shipToName', client.companyName || client.name);
-            form.setValue('shipToAddress', client.address || '');
-            form.setValue('shipToTaxId', client.taxId || '');
-        }
+      // Solo actualizamos si el formulario ya ha sido inicializado y el usuario cambia el cliente
+      if (form.formState.isDirty) {
+          const client = clients.find(c => c.id === watchedClientId);
+          if (client) {
+            form.setValue('clientAddress', client.address || '');
+            form.setValue('clientTaxId', client.taxId || '');
+            form.setValue('customerSignatoryName', client.companyName || client.name);
+            
+            // Auto set ShipTo if not set or same as client
+            const currentShipTo = form.getValues('shipToClientId');
+            if(!currentShipTo || currentShipTo === watchedClientId) {
+                form.setValue('shipToClientId', client.id);
+                form.setValue('shipToName', client.companyName || client.name);
+                form.setValue('shipToAddress', client.address || '');
+                form.setValue('shipToTaxId', client.taxId || '');
+            }
+          }
       }
     }
   }, [form, watchedClientId, clients]);
 
   useEffect(() => {
-    if(watchedShipToClientId && clients) {
+    if(watchedShipToClientId && clients && form.formState.isDirty) {
         const client = clients.find(c => c.id === watchedShipToClientId);
         if (client) {
             form.setValue('shipToName', client.companyName || client.name);
@@ -183,7 +189,7 @@ export default function EditProformaPage() {
     const updatedProforma: Proforma = {
       ...proformaToEdit,
       ...data,
-      clientName: client?.companyName || client?.name || 'Unknown Client',
+      clientName: client?.companyName || client?.name || proformaToEdit.clientName, // Fallback to existing name
       subTotal: finalSubTotal,
       taxAmount: finalTaxAmount,
       grandTotal: finalGrandTotal,
@@ -245,6 +251,7 @@ export default function EditProformaPage() {
     );
   }
   
+  // CORRECCIÓN CLIENTES: Filtramos, pero si la lista está vacía o el cliente actual no está, NO bloqueamos el select.
   const availableClients = clients?.filter(c => c.company === watchedCompany || c.company === 'Both') || [];
 
   return (
@@ -321,14 +328,22 @@ export default function EditProformaPage() {
                 name="clientId"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} disabled={availableClients.length === 0}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                    // CORRECCIÓN: Eliminado disabled={availableClients.length === 0} para evitar bloqueo
+                  >
                     <SelectTrigger id="clientId">
                       <SelectValue placeholder="Select a client" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableClients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.companyName} ({client.name})</SelectItem>
-                      ))}
+                      {availableClients.length > 0 ? (
+                          availableClients.map(client => (
+                            <SelectItem key={client.id} value={client.id}>{client.companyName} ({client.name})</SelectItem>
+                          ))
+                      ) : (
+                          <SelectItem value="loading" disabled>No clients found for this company</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 )}
@@ -359,7 +374,11 @@ export default function EditProformaPage() {
                 name="shipToClientId"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} disabled={availableClients.length === 0}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                    // CORRECCIÓN: Eliminado disabled para evitar bloqueo
+                  >
                     <SelectTrigger id="shipToClientId">
                       <SelectValue placeholder="Select a client" />
                     </SelectTrigger>
@@ -390,6 +409,7 @@ export default function EditProformaPage() {
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Sales &amp; Delivery Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {/* CORRECCIÓN: Uso de Combobox para Puertos */}
              <div>
               <Label htmlFor="portAtOrigin">Port at Origin</Label>
               <Controller
@@ -443,6 +463,7 @@ export default function EditProformaPage() {
           </CardContent>
         </Card>
 
+        {/* ... (El resto del formulario de productos se mantiene igual) ... */}
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Proforma Items</CardTitle></CardHeader>
           <CardContent>
