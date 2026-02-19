@@ -1,4 +1,3 @@
-
 'use client'
 import { useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProformas } from '@/hooks/use-proformas';
-import { Download, BarChart3, Users, CheckCircle, DollarSign, FileClock } from 'lucide-react';
+import { Download, BarChart3, CheckCircle, DollarSign, FileClock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { StatusBadge } from '@/components/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,19 +24,37 @@ export default function StatsPage() {
     const totalBilledAmount = approvedProformas.reduce((sum, p) => sum + p.grandTotal, 0);
     const draftAmount = draftProformas.reduce((sum, p) => sum + p.grandTotal, 0);
 
+    // NUEVA LÓGICA: Agrupamos por Cliente Y Empresa para que no se mezclen los saldos
     const proformasByClient = proformas.reduce((acc, proforma) => {
-        if (!acc[proforma.clientName]) {
-            acc[proforma.clientName] = { count: 0, totalValue: 0, balance: 0, company: proforma.company };
+        // Creamos una llave única combinando cliente y empresa
+        const key = `${proforma.clientName}-${proforma.company}`;
+        
+        if (!acc[key]) {
+            acc[key] = { 
+              clientName: proforma.clientName, 
+              count: 0, 
+              totalValue: 0, 
+              balance: 0, 
+              company: proforma.company 
+            };
         }
-        acc[proforma.clientName].count++;
-        acc[proforma.clientName].totalValue += proforma.grandTotal;
+        acc[key].count++;
+        acc[key].totalValue += proforma.grandTotal;
         const paid = proforma.payments?.reduce((s, p) => s + p.amount, 0) || 0;
-        acc[proforma.clientName].balance += (proforma.grandTotal - paid);
+        acc[key].balance += (proforma.grandTotal - paid);
         return acc;
-    }, {} as Record<string, { count: number; totalValue: number; balance: number, company: Proforma['company'] }>);
+    }, {} as Record<string, { clientName: string; count: number; totalValue: number; balance: number, company: Proforma['company'] }>);
 
-    const treBalance = Object.values(proformasByClient).filter(c => c.company === 'Trade Evolution').reduce((sum, c) => sum + c.balance, 0);
-    const stBalance = Object.values(proformasByClient).filter(c => c.company === 'Successful Trade').reduce((sum, c) => sum + c.balance, 0);
+    // Extraemos los valores como un arreglo para usarlos fácilmente
+    const clientSummaries = Object.values(proformasByClient);
+
+    const treBalance = clientSummaries
+      .filter(c => c.company === 'Trade Evolution')
+      .reduce((sum, c) => sum + c.balance, 0);
+      
+    const stBalance = clientSummaries
+      .filter(c => c.company === 'Successful Trade')
+      .reduce((sum, c) => sum + c.balance, 0);
 
     return {
         totalProformas,
@@ -45,10 +62,10 @@ export default function StatsPage() {
         draftProformasCount: draftProformas.length,
         totalBilledAmount,
         draftAmount,
-        proformasByClient,
+        clientSummaries,
         treBalance,
         stBalance,
-        draftProformas // <-- Añadido para poder usar el arreglo en la vista
+        draftProformas
     };
   }, [proformas]);
 
@@ -83,8 +100,7 @@ export default function StatsPage() {
     )
   }
   
-  // Extraemos draftProformas de stats
-  const { totalProformas, approvedProformasCount, draftProformasCount, totalBilledAmount, draftAmount, proformasByClient, treBalance, stBalance, draftProformas } = stats;
+  const { totalProformas, approvedProformasCount, draftProformasCount, totalBilledAmount, draftAmount, clientSummaries, treBalance, stBalance, draftProformas } = stats;
 
   return (
     <div>
@@ -156,23 +172,23 @@ export default function StatsPage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <h3 className="font-semibold mb-2">Trade Evolution</h3>
+                <h3 className="font-semibold mb-2 text-primary">Trade Evolution</h3>
                 <Table>
                     <TableHeader><TableRow><TableHead>Client</TableHead><TableHead className="text-right">Balance Due</TableHead></TableRow></TableHeader>
                     <TableBody>
-                    {Object.entries(proformasByClient).filter(([,data]) => data.company === 'Trade Evolution').map(([client, data]) => (
-                        <TableRow key={client}><TableCell>{client}</TableCell><TableCell className="text-right">${data.balance.toFixed(2)}</TableCell></TableRow>
+                    {clientSummaries.filter(data => data.company === 'Trade Evolution').map((data, index) => (
+                        <TableRow key={index}><TableCell>{data.clientName}</TableCell><TableCell className="text-right">${data.balance.toFixed(2)}</TableCell></TableRow>
                     ))}
                     </TableBody>
                 </Table>
             </div>
              <div>
-                <h3 className="font-semibold mb-2">Successful Trade</h3>
+                <h3 className="font-semibold mb-2 text-primary">Successful Trade</h3>
                 <Table>
                     <TableHeader><TableRow><TableHead>Client</TableHead><TableHead className="text-right">Balance Due</TableHead></TableRow></TableHeader>
                     <TableBody>
-                    {Object.entries(proformasByClient).filter(([,data]) => data.company === 'Successful Trade').map(([client, data]) => (
-                        <TableRow key={client}><TableCell>{client}</TableCell><TableCell className="text-right">${data.balance.toFixed(2)}</TableCell></TableRow>
+                    {clientSummaries.filter(data => data.company === 'Successful Trade').map((data, index) => (
+                        <TableRow key={index}><TableCell>{data.clientName}</TableCell><TableCell className="text-right">${data.balance.toFixed(2)}</TableCell></TableRow>
                     ))}
                     </TableBody>
                 </Table>
@@ -180,7 +196,6 @@ export default function StatsPage() {
         </CardContent>
       </Card>
 
-      {/* NUEVA SECCIÓN: Resumen de Proformas en Draft */}
       <Card className="mb-8 shadow-lg border-dashed border-2">
         <CardHeader>
           <CardTitle>Draft Proformas Summary</CardTitle>
