@@ -1,6 +1,6 @@
 
 'use client';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, notFound } from 'next/navigation';
 import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -137,15 +137,7 @@ export default function BillOfLadingPage() {
   }
 
   if (!proforma) {
-    return (
-      <div className="container mx-auto py-8">
-        <PageHeader title="Proforma Not Found" />
-        <p>Could not find proforma with ID: {proformaId}.</p>
-        <Link href={`/proformas`} passHref>
-          <Button variant="outline" className="mt-4"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Proformas</Button>
-        </Link>
-      </div>
-    );
+    notFound();
   }
 
   const fileName = proforma.editableBillOfLadingSpecificFields?.blNo || (proforma.uploadedBillOfLadingUrl ? 'Uploaded Document' : '');
