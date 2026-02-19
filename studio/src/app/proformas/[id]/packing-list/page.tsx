@@ -1,5 +1,6 @@
+
 'use client';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, notFound } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -74,6 +75,12 @@ export default function PackingListPage() {
 
     let containersData: PackingListContainer[];
 
+
+    const combinedDescription = currentProforma.items
+      .map(item => `${item.productName}${item.description ? '\n' + item.description : ''}`)
+      .join('\n\n'); // Unir descripciones con saltos de línea
+    const totalQuantity = currentProforma.items.reduce((sum, item) => sum + item.quantity, 0);
+
     if(editableFields?.editedContainers && editableFields.editedContainers.length > 0){
         containersData = editableFields.editedContainers.map(ec => {
             const correspondingItem = currentProforma.items[0] || { productName: '', description: '', quantity: 0 };
@@ -101,6 +108,13 @@ export default function PackingListPage() {
     }
     
     const tradeEvoDetails = companyDetails['Trade Evolution'];
+
+    let rawInvoiceNumber = currentProforma.editableInvoiceSpecificFields?.invoiceNumber || defaultInvoiceNumber;
+    if (currentProforma.proformaNumber && rawInvoiceNumber.includes(currentProforma.proformaNumber)) {
+        const soIndex = rawInvoiceNumber.indexOf(currentProforma.proformaNumber);
+        rawInvoiceNumber = rawInvoiceNumber.substring(0, soIndex).replace(/[-\/\s]+$/, '').trim();
+    }
+
 
     return {
       packingListName: generatePackingListName(currentProforma),
@@ -198,22 +212,17 @@ export default function PackingListPage() {
     return <div className="container mx-auto py-8"><div className="flex justify-center items-center h-64"><p>Loading Packing List...</p></div></div>;
   }
 
-  if (!packingListData || !proforma) {
-    return (
-      <div className="container mx-auto py-8">
-        <PageHeader title="Packing List Not Found" />
-        <p>Could not generate Packing List for Proforma ID: {proformaId}.</p>
-        <Link href={`/proformas/${proformaId}`} passHref>
-          <Button variant="outline" className="mt-4"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Proforma</Button>
-        </Link>
-      </div>
-    );
+  if (!proforma) {
+    notFound();
   }
+
+  // Regenerate packingListData with the confirmed valid proforma
+  const finalPackingListData = generatePackingListDataFromProforma(proforma, client);
 
   return (
     <div className="container mx-auto py-2">
       <PageHeader
-        title={`Packing List ${packingListData.packingListName}`}
+        title={`Packing List ${finalPackingListData.packingListName}`}
         description="Review, edit, and print the Packing List."
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
@@ -297,7 +306,7 @@ export default function PackingListPage() {
         </Card>
       )}
       <div className="packing-list-document-area">
-        <PackingListDocument data={packingListData} />
+        <PackingListDocument data={finalPackingListData} />
       </div>
        <style jsx global>{`
         @page {

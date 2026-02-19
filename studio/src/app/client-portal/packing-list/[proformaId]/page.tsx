@@ -36,7 +36,7 @@ function PackingListView() {
     });
     return () => unsubscribe();
   }, []);
-  
+
   const client = useMemo(() => {
     if (!clients) return null;
     if (clientIdFromUrl) return clients.find(c => c.id === clientIdFromUrl);
@@ -59,39 +59,54 @@ function PackingListView() {
 
     let containersData: PackingListContainer[];
 
-    if(editableFields?.editedContainers && editableFields.editedContainers.length > 0){
-        containersData = editableFields.editedContainers.map(ec => {
-            const correspondingItem = proforma.items[0] || { productName: '', description: '', quantity: 0 };
-            return {
-                ...ec,
-                items: [{ descriptionOfGoods: `${correspondingItem.productName}\n${correspondingItem.description || ''}`, piecesXPack: 1 }],
-                totalPacks: correspondingItem.quantity,
-                totalPieces: correspondingItem.quantity,
-            };
-        });
+    const combinedDescription = proforma.items
+      .map(item => `${item.productName}${item.description ? '\n' + item.description : ''}`)
+      .join('\n\n');
+    const totalQuantity = proforma.items.reduce((sum, item) => sum + item.quantity, 0);
+
+
+
+    if (editableFields?.editedContainers && editableFields.editedContainers.length > 0) {
+      containersData = editableFields.editedContainers.map(ec => {
+        const correspondingItem = proforma.items[0] || { productName: '', description: '', quantity: 0 };
+        return {
+          ...ec,
+          items: [{ descriptionOfGoods: `${correspondingItem.productName}\n${correspondingItem.description || ''}`, piecesXPack: 1 }],
+          totalPacks: correspondingItem.quantity,
+          totalPieces: correspondingItem.quantity,
+        };
+      });
     } else {
-        containersData = proforma.items.map(item => {
-            const netWeight = item.unitPrice * item.quantity * 0.90;
-            const grossWeight = item.unitPrice * item.quantity * 0.95;
-            return {
-                containerNumber: proforma.containerNo || "TBN",
-                netWeight: netWeight,
-                grossWeight: grossWeight,
-                items: [{ descriptionOfGoods: `${item.productName}\n${item.description || ''}`, piecesXPack: 1 }],
-                totalPacks: item.quantity,
-                totalPieces: item.quantity,
-                totalVolumeM3: parseFloat((item.quantity * 0.05).toFixed(3)), // Example calculation
-            }
-        });
+      containersData = proforma.items.map(item => {
+        const netWeight = item.unitPrice * item.quantity * 0.90;
+        const grossWeight = item.unitPrice * item.quantity * 0.95;
+        return {
+          containerNumber: proforma.containerNo || "TBN",
+          netWeight: netWeight,
+          grossWeight: grossWeight,
+          items: [{ descriptionOfGoods: `${item.productName}\n${item.description || ''}`, piecesXPack: 1 }],
+          totalPacks: item.quantity,
+          totalPieces: item.quantity,
+          totalVolumeM3: parseFloat((item.quantity * 0.05).toFixed(3)), // Example calculation
+        }
+      });
     }
-    
+
     const tradeEvoDetails = companyDetails['Trade Evolution'];
+
+    let rawInvoiceNumber = editableFields?.invoiceNumber || defaultInvoiceNumber;
+    if (proforma.proformaNumber && rawInvoiceNumber.includes(proforma.proformaNumber)) {
+        const soIndex = rawInvoiceNumber.indexOf(proforma.proformaNumber);
+        rawInvoiceNumber = rawInvoiceNumber.substring(0, soIndex).replace(/[-\/\s]+$/, '').trim();
+    }
+
+
 
     return {
       packingListName: generatePackingListName(proforma),
-      proformaId: proforma.id, 
+      proformaId: proforma.id,
       company: proforma.company as 'Trade Evolution' | 'Successful Trade',
-      issuedAtPlace: editableFields?.issuedAtPlace || defaultIssuedAtPlace, 
+      issuedAtPlace: editableFields?.issuedAtPlace || defaultIssuedAtPlace,
       issuedAtDate: proforma.issuedDate,
       billTo: { name: client.companyName || proforma.clientName, addressLines: (proforma.clientAddress || client.address || 'N/A').split('\n'), taxId: proforma.clientTaxId || client.taxId },
       shipTo: { name: proforma.shipToName || client.companyName || proforma.clientName, addressLines: (proforma.shipToAddress || proforma.clientAddress || client.address || 'N/A').split('\n'), taxId: proforma.shipToTaxId || proforma.clientTaxId || client.taxId },
@@ -99,16 +114,16 @@ function PackingListView() {
       custRef: proforma.reference, portAtOrigin: proforma.portAtOrigin || 'N/A', portOfArrival: proforma.portOfArrival || 'N/A',
       finalDestination: proforma.finalDestination || 'N/A', containers: proforma.containers || 'N/A', piRef: proforma.proformaNumber,
       productSummary: editableFields?.productSummary || defaultProductSummary, packingListNotes: editableFields?.packingListNotes,
-      containerItems: containersData, salesOrderNumber: proforma.proformaNumber, 
+      containerItems: containersData, salesOrderNumber: proforma.proformaNumber,
       companyName: tradeEvoDetails.name, companyTaxId: tradeEvoDetails.taxId, companyPhone: tradeEvoDetails.phone, companyAddress: tradeEvoDetails.address, companyWebsite: tradeEvoDetails.website,
     };
   }, [proforma, client, isAuthorized]);
-  
+
   const portalLinkQuery = clientIdFromUrl ? `?clientId=${clientIdFromUrl}` : '';
   const portalLink = `/client-portal${portalLinkQuery}`;
 
   const handlePrint = () => {
-    toast({ title: "Printing Packing List...", description: "Your browser's print dialog should appear."});
+    toast({ title: "Printing Packing List...", description: "Your browser's print dialog should appear." });
     window.print();
   };
 
@@ -122,15 +137,15 @@ function PackingListView() {
     const mailtoLink = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoLink;
   };
-  
+
   const isLoading = isLoadingProforma || isLoadingClients || isLoadingAuth;
 
   if (isLoading) {
     return <div className="container mx-auto py-8 text-center"><p>Loading Packing List...</p></div>;
   }
-  
+
   if (!isAuthorized || !packingListData) {
-      notFound();
+    notFound();
   }
 
   return (
@@ -140,7 +155,7 @@ function PackingListView() {
         actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             <Button variant="outline" onClick={() => router.push(portalLink)}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Portal
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Portal
             </Button>
             <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4" /> Print / PDF</Button>
             <Button onClick={handleSendEmail} variant="outline">
@@ -152,7 +167,7 @@ function PackingListView() {
       <div className="packing-list-document-area">
         <PackingListDocument data={packingListData} />
       </div>
-       <style jsx global>{`
+      <style jsx global>{`
         @page {
             size: auto;
             margin: 0;
@@ -168,9 +183,9 @@ function PackingListView() {
 }
 
 export default function ClientPackingListViewPage() {
-    return (
-        <Suspense fallback={<div className="container mx-auto py-8 text-center"><p>Loading Packing List...</p></div>}>
-            <PackingListView />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={<div className="container mx-auto py-8 text-center"><p>Loading Packing List...</p></div>}>
+      <PackingListView />
+    </Suspense>
+  )
 }
