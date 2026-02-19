@@ -161,22 +161,24 @@ function SuccessfulTradeProforma({ proforma, client, company }: { proforma: Prof
             </div>
         </div>
 
-{/* Footer */}
-<div className="text-center mt-12 pt-4 border-t border-black text-xs">
-            <p className="font-bold">{company.name} (UEN: {company.uen})</p>
-            <p>{company.address}</p>
-            <p>Tel: {company.phone} | Web: {company.website}</p>
-            <p className="mt-2 text-[10.5px] italic text-gray-600">{company.footerText}</p>
+        {/* Global note */}
+        <div className="text-center mt-4">
+            <p className="text-xs">{company.footerText}</p>
         </div>
-        <style jsx global>{`
+
+        {/* Footer */}
+        <div className="text-center font-semibold mt-8 pt-2 border-t border-black">
+            <p>{company.website}</p>
+        </div>
+         <style jsx global>{`
           @media print {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .print\\:shadow-none { box-shadow: none !important; }
           }
         `}</style>
     </div>
   );
 }
+
 
 // --- Trade Evolution Proforma Template ---
 function TradeEvolutionProforma({ proforma, client, company }: { proforma: Proforma, client: Client | undefined, company: typeof companyDetails['Trade Evolution']}) {
