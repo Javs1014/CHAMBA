@@ -1,6 +1,6 @@
 
 'use client';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams, notFound } from 'next/navigation';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -23,8 +23,6 @@ function InvoiceView() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const proformaId = params.proformaId as string;
 
-  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
-  
   const { data: proforma, isLoading: isLoadingProforma } = useProforma(proformaId);
   const { data: clients, isLoading: isLoadingClients } = useClients();
 
@@ -39,65 +37,63 @@ function InvoiceView() {
   }, []);
   
   const client = useMemo(() => {
-    if(!clients) return null;
-    if(clientIdFromUrl) return clients.find(c => c.id === clientIdFromUrl);
-    if(user) return clients.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
+    if (!clients) return null;
+    if (clientIdFromUrl) return clients.find(c => c.id === clientIdFromUrl);
+    if (user) return clients.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
     return null;
   }, [clients, user, clientIdFromUrl]);
+  
+  const isAuthorized = useMemo(() => {
+    if (!proforma || !client) return false;
+    return proforma.clientId === client.id;
+  }, [proforma, client]);
 
-  const generateInvoiceDataFromProforma = (currentProforma: Proforma, currentClient?: Client | null): InvoiceData => {
-    const foundClient = currentClient || clients?.find(c => c.id === currentProforma.clientId);
+  const invoiceData = useMemo((): InvoiceData | null => {
+    if (!isAuthorized || !proforma || !client) return null;
 
-    const finalInvoiceNumber = generateInvoiceNumber(currentProforma);
-    const editableFields = currentProforma.editableInvoiceSpecificFields;
-    const finalIssuedDate = editableFields?.issuedAtDate || currentProforma.issuedDate;
-    const finalPaymentTerms = editableFields?.paymentTerms || currentProforma.paymentTerms;
+    const finalInvoiceNumber = generateInvoiceNumber(proforma);
+    const editableFields = proforma.editableInvoiceSpecificFields;
+    const finalIssuedDate = editableFields?.issuedAtDate || proforma.issuedDate;
+    const finalPaymentTerms = editableFields?.paymentTerms || proforma.paymentTerms;
 
     return {
-      proformaId: currentProforma.id,
+      proformaId: proforma.id,
       invoiceNumber: finalInvoiceNumber,
-      issuedAtPlace: currentProforma.company === 'Successful Trade' ? "" : "Tallinn, Estonia",
+      issuedAtPlace: proforma.company === 'Successful Trade' ? "" : "Tallinn, Estonia",
       issuedAtDate: finalIssuedDate,
-      company: currentProforma.company as 'Trade Evolution' | 'Successful Trade',
+      company: proforma.company as 'Trade Evolution' | 'Successful Trade',
       soldTo: {
-        name: foundClient?.companyName || currentProforma.clientName,
-        addressLines: (currentProforma.clientAddress || foundClient?.address || 'N/A').split('\n'),
-        taxId: currentProforma.clientTaxId || foundClient?.taxId,
+        name: client.companyName || proforma.clientName,
+        addressLines: (proforma.clientAddress || client.address || 'N/A').split('\n'),
+        taxId: proforma.clientTaxId || client.taxId,
       },
       shipTo: {
-        name: currentProforma.shipToName || foundClient?.companyName || currentProforma.clientName,
-        addressLines: (currentProforma.shipToAddress || currentProforma.clientAddress || foundClient?.address || 'N/A').split('\n'),
-        taxId: currentProforma.shipToTaxId || currentProforma.clientTaxId || foundClient?.taxId,
+        name: proforma.shipToName || client.companyName || proforma.clientName,
+        addressLines: (proforma.shipToAddress || proforma.clientAddress || client.address || 'N/A').split('\n'),
+        taxId: proforma.shipToTaxId || proforma.clientTaxId || client.taxId,
       },
-      currency: currentProforma.currency,
-      items: currentProforma.items.map(item => ({
+      currency: proforma.currency,
+      items: proforma.items.map(item => ({
           ...item,
           description: item.description || item.productName
       })),
       salesDetail: {
-        portAtOrigin: currentProforma.portAtOrigin,
-        portOfArrival: currentProforma.portOfArrival,
-        finalDestination: currentProforma.finalDestination,
-        reference: currentProforma.reference,
+        portAtOrigin: proforma.portAtOrigin,
+        portOfArrival: proforma.portOfArrival,
+        finalDestination: proforma.finalDestination,
+        reference: proforma.reference,
         paymentTerms: finalPaymentTerms,
-        vessel: currentProforma.vessel,
-        containers: currentProforma.containers,
-        containerNo: currentProforma.containerNo,
-        proformaRefNumber: currentProforma.proformaNumber,
+        vessel: proforma.vessel,
+        containers: proforma.containers,
+        containerNo: proforma.containerNo,
+        proformaRefNumber: proforma.proformaNumber,
       },
-      subTotal: currentProforma.subTotal,
-      salesTax: currentProforma.taxAmount ?? 0,
-      total: currentProforma.grandTotal,
-      proformaNumber: currentProforma.proformaNumber,
+      subTotal: proforma.subTotal,
+      salesTax: proforma.taxAmount ?? 0,
+      total: proforma.grandTotal,
+      proformaNumber: proforma.proformaNumber,
     };
-  };
-
-  useEffect(() => {
-    if (proforma && (client || clientIdFromUrl) && (proforma.clientId === client?.id || clientIdFromUrl)) {
-      const data = generateInvoiceDataFromProforma(proforma, client);
-      setInvoiceData(data);
-    }
-  }, [proforma, client, clientIdFromUrl, clients]);
+  }, [proforma, client, isAuthorized]);
 
   const handlePrint = () => {
     toast({ title: "Printing Invoice...", description: "Your browser's print dialog should appear."});
@@ -124,16 +120,8 @@ function InvoiceView() {
     return <div className="container mx-auto py-8 text-center"><p>Loading Invoice...</p></div>;
   }
   
-  if (!proforma || !invoiceData) {
-      return (
-          <div className="container mx-auto py-8">
-              <PageHeader title="Invoice Not Found" />
-              <p>This invoice could not be loaded or you do not have permission to view it.</p>
-              <Button variant="outline" className="mt-4" onClick={() => router.push(portalLink)}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Portal
-              </Button>
-          </div>
-      );
+  if (!isAuthorized || !invoiceData) {
+    notFound();
   }
 
   return (

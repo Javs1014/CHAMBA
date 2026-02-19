@@ -1,6 +1,6 @@
 
 'use client';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams, notFound } from 'next/navigation';
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,6 @@ function PackingListView() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const proformaId = params.proformaId as string;
 
-  const [packingListData, setPackingListData] = useState<PackingListData | null>(null);
-
   const { data: proforma, isLoading: isLoadingProforma } = useProforma(proformaId);
   const { data: clients, isLoading: isLoadingClients } = useClients();
 
@@ -40,58 +38,71 @@ function PackingListView() {
   }, []);
   
   const client = useMemo(() => {
-    if(!clients) return null;
-    if(clientIdFromUrl) return clients.find(c => c.id === clientIdFromUrl);
-    if(user) return clients.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
+    if (!clients) return null;
+    if (clientIdFromUrl) return clients.find(c => c.id === clientIdFromUrl);
+    if (user) return clients.find(c => c.email.toLowerCase() === user.email?.toLowerCase());
     return null;
   }, [clients, user, clientIdFromUrl]);
-  
-  const generatePackingListDataFromProforma = (currentProforma: Proforma, currentClient?: Client | null): PackingListData => {
-    const foundClient = currentClient || clients?.find(c => c.id === currentProforma.clientId);
-    const editableFields = currentProforma.editablePackingListSpecificFields;
 
-    const defaultInvoiceNumber = generateInvoiceNumber(currentProforma);
-    const defaultProductSummary = currentProforma.items.map(item => item.productName).join('\n');
-    const defaultIssuedAtPlace = currentProforma.company === 'Successful Trade' ? "" : "Tallinn, Estonia";
+  const isAuthorized = useMemo(() => {
+    if (!proforma || !client) return false;
+    return proforma.clientId === client.id;
+  }, [proforma, client]);
 
-    const containersData: PackingListContainer[] = currentProforma.items.map(item => {
-        const netWeight = item.unitPrice * item.quantity * 0.90;
-        const grossWeight = item.unitPrice * item.quantity * 0.95;
-        return {
-            containerNumber: currentProforma.containerNo || "TBN",
-            netWeight: netWeight,
-            grossWeight: grossWeight,
-            items: [{ descriptionOfGoods: `${item.productName}\n${item.description || ''}`, piecesXPack: 1 }],
-            totalPacks: item.quantity,
-            totalPieces: item.quantity,
-            totalVolumeM3: parseFloat((item.quantity * 0.05).toFixed(3)),
-        }
-    });
+  const packingListData = useMemo((): PackingListData | null => {
+    if (!isAuthorized || !proforma || !client) return null;
+
+    const editableFields = proforma.editablePackingListSpecificFields;
+    const defaultInvoiceNumber = generateInvoiceNumber(proforma);
+    const defaultProductSummary = proforma.items.map(item => item.productName).join('\n');
+    const defaultIssuedAtPlace = proforma.company === 'Successful Trade' ? "" : "Tallinn, Estonia";
+
+    let containersData: PackingListContainer[];
+
+    if(editableFields?.editedContainers && editableFields.editedContainers.length > 0){
+        containersData = editableFields.editedContainers.map(ec => {
+            const correspondingItem = proforma.items[0] || { productName: '', description: '', quantity: 0 };
+            return {
+                ...ec,
+                items: [{ descriptionOfGoods: `${correspondingItem.productName}\n${correspondingItem.description || ''}`, piecesXPack: 1 }],
+                totalPacks: correspondingItem.quantity,
+                totalPieces: correspondingItem.quantity,
+            };
+        });
+    } else {
+        containersData = proforma.items.map(item => {
+            const netWeight = item.unitPrice * item.quantity * 0.90;
+            const grossWeight = item.unitPrice * item.quantity * 0.95;
+            return {
+                containerNumber: proforma.containerNo || "TBN",
+                netWeight: netWeight,
+                grossWeight: grossWeight,
+                items: [{ descriptionOfGoods: `${item.productName}\n${item.description || ''}`, piecesXPack: 1 }],
+                totalPacks: item.quantity,
+                totalPieces: item.quantity,
+                totalVolumeM3: parseFloat((item.quantity * 0.05).toFixed(3)), // Example calculation
+            }
+        });
+    }
     
     const tradeEvoDetails = companyDetails['Trade Evolution'];
 
     return {
-      packingListName: generatePackingListName(currentProforma),
-      proformaId: currentProforma.id, 
-      company: currentProforma.company as 'Trade Evolution' | 'Successful Trade',
-      issuedAtPlace: editableFields?.issuedAtPlace || defaultIssuedAtPlace, issuedAtDate: currentProforma.issuedDate,
-      billTo: { name: foundClient?.companyName || currentProforma.clientName, addressLines: (currentProforma.clientAddress || foundClient?.address || 'N/A').split('\n'), taxId: currentProforma.clientTaxId || foundClient?.taxId },
-      shipTo: { name: currentProforma.shipToName || foundClient?.companyName || currentProforma.clientName, addressLines: (currentProforma.shipToAddress || currentProforma.clientAddress || foundClient?.address || 'N/A').split('\n'), taxId: currentProforma.shipToTaxId || currentProforma.clientTaxId || foundClient?.taxId },
-      invoiceRef: currentProforma.editableInvoiceSpecificFields?.invoiceNumber || defaultInvoiceNumber,
-      custRef: currentProforma.reference, portAtOrigin: currentProforma.portAtOrigin || 'N/A', portOfArrival: currentProforma.portOfArrival || 'N/A',
-      finalDestination: currentProforma.finalDestination || 'N/A', containers: currentProforma.containers || 'N/A', piRef: currentProforma.proformaNumber,
+      packingListName: generatePackingListName(proforma),
+      proformaId: proforma.id, 
+      company: proforma.company as 'Trade Evolution' | 'Successful Trade',
+      issuedAtPlace: editableFields?.issuedAtPlace || defaultIssuedAtPlace, 
+      issuedAtDate: proforma.issuedDate,
+      billTo: { name: client.companyName || proforma.clientName, addressLines: (proforma.clientAddress || client.address || 'N/A').split('\n'), taxId: proforma.clientTaxId || client.taxId },
+      shipTo: { name: proforma.shipToName || client.companyName || proforma.clientName, addressLines: (proforma.shipToAddress || proforma.clientAddress || client.address || 'N/A').split('\n'), taxId: proforma.shipToTaxId || proforma.clientTaxId || client.taxId },
+      invoiceRef: proforma.editableInvoiceSpecificFields?.invoiceNumber || defaultInvoiceNumber,
+      custRef: proforma.reference, portAtOrigin: proforma.portAtOrigin || 'N/A', portOfArrival: proforma.portOfArrival || 'N/A',
+      finalDestination: proforma.finalDestination || 'N/A', containers: proforma.containers || 'N/A', piRef: proforma.proformaNumber,
       productSummary: editableFields?.productSummary || defaultProductSummary, packingListNotes: editableFields?.packingListNotes,
-      containerItems: containersData, salesOrderNumber: currentProforma.proformaNumber, 
+      containerItems: containersData, salesOrderNumber: proforma.proformaNumber, 
       companyName: tradeEvoDetails.name, companyTaxId: tradeEvoDetails.taxId, companyPhone: tradeEvoDetails.phone, companyAddress: tradeEvoDetails.address, companyWebsite: tradeEvoDetails.website,
     };
-  };
-
-  useEffect(() => {
-    if (proforma && (client || clientIdFromUrl) && (proforma.clientId === client?.id || clientIdFromUrl)) {
-      const data = generatePackingListDataFromProforma(proforma, client);
-      setPackingListData(data);
-    }
-  }, [proforma, client, clientIdFromUrl, clients]);
+  }, [proforma, client, isAuthorized]);
   
   const portalLinkQuery = clientIdFromUrl ? `?clientId=${clientIdFromUrl}` : '';
   const portalLink = `/client-portal${portalLinkQuery}`;
@@ -118,16 +129,8 @@ function PackingListView() {
     return <div className="container mx-auto py-8 text-center"><p>Loading Packing List...</p></div>;
   }
   
-  if (!proforma || !packingListData) {
-      return (
-          <div className="container mx-auto py-8">
-              <PageHeader title="Packing List Not Found" />
-              <p>This Packing List could not be loaded or you do not have permission to view it.</p>
-              <Button variant="outline" className="mt-4" onClick={() => router.push(portalLink)}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Portal
-              </Button>
-          </div>
-      );
+  if (!isAuthorized || !packingListData) {
+      notFound();
   }
 
   return (

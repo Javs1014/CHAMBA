@@ -42,8 +42,19 @@ export function Combobox({
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState(value || "")
 
+  // Sincronizar inputValue si el value externo cambia (opcional pero recomendado)
+  React.useEffect(() => {
+     if (!open) {
+       setInputValue(value || "");
+     }
+  }, [value, open]);
+
   const handleSelect = (currentValue: string) => {
-    const newValue = currentValue.toLowerCase() === value.toLowerCase() ? "" : currentValue;
+    
+    const matchedOption = options.find(opt => opt.label.toLowerCase() === currentValue.toLowerCase());
+    const finalValue = matchedOption ? matchedOption.label : currentValue;
+
+    const newValue = finalValue === value ? "" : finalValue;
     onChange(newValue);
     setInputValue(newValue);
     setOpen(false);
@@ -76,7 +87,8 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command shouldFilter={false}>
+        {/* Eliminamos shouldFilter={false} para activar el filtrado nativo */}
+        <Command>
           <CommandInput 
             placeholder="Search or type custom value..."
             value={inputValue}
@@ -88,7 +100,7 @@ export function Combobox({
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.label}
+                  value={option.label} // Usamos el label como valor para el filtro
                   onSelect={handleSelect}
                 >
                   <Check

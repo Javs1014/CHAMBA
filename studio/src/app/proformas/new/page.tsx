@@ -24,11 +24,12 @@ import { useProformas, useAddProforma } from '@/hooks/use-proformas';
 import { Combobox } from '@/components/ui/combobox';
 import { portOptions } from '@/config/ports';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft } from 'lucide-react'
 
 const proformaItemSchema = z.object({
   productId: z.string().min(1, "Product is required"),
   quantity: z.number().min(0.0001, "Quantity must be greater than 0"),
-  unitPrice: z.number().min(0, "Unit price must be non-negative"), 
+  unitPrice: z.number().min(0, "Unit price must be non-negative"),
   productName: z.string(),
   description: z.string().optional(),
   unit: z.string(),
@@ -41,7 +42,7 @@ const proformaFormSchema = z.object({
   issuedDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid date" }),
   expiryDate: z.string().optional(),
   proformaNumber: z.string().min(1, "Proforma number is required"),
-  
+
   clientAddress: z.string().optional(),
   clientTaxId: z.string().optional(),
   shipToName: z.string().optional(),
@@ -50,7 +51,7 @@ const proformaFormSchema = z.object({
   shipToClientId: z.string().optional(),
 
   currency: z.string().min(1, "Currency is required").default("USD DOLLAR"),
-  
+
   portAtOrigin: z.string().optional(),
   portOfArrival: z.string().optional(),
   finalDestination: z.string().optional(),
@@ -73,7 +74,7 @@ export default function NewProformaPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [selectedProductToAdd, setSelectedProductToAdd] = useState<Product | null>(null);
-  
+
   const { data: clients, isLoading: isLoadingClients } = useClients();
   const { data: products, isLoading: isLoadingProducts } = useProducts();
   const { data: allProformas, isLoading: isLoadingProformas } = useProformas();
@@ -109,16 +110,16 @@ export default function NewProformaPage() {
   const subTotal = watchedItems.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0);
   const taxAmount = subTotal * watchedTaxRate;
   const grandTotal = subTotal + taxAmount;
-  
+
   useEffect(() => {
     if (watchedCompany && watchedIssuedDate && allProformas) {
       try {
-          const date = parse(watchedIssuedDate, 'yyyy-MM-dd', new Date());
-          if (!isNaN(date.getTime())) {
-              const newNumber = generateProformaNumber(watchedCompany as 'Trade Evolution' | 'Successful Trade', date, allProformas);
-              form.setValue('proformaNumber', newNumber);
-          }
-      } catch(e) {
+        const date = parse(watchedIssuedDate, 'yyyy-MM-dd', new Date());
+        if (!isNaN(date.getTime())) {
+          const newNumber = generateProformaNumber(watchedCompany as 'Trade Evolution' | 'Successful Trade', date, allProformas);
+          form.setValue('proformaNumber', newNumber);
+        }
+      } catch (e) {
         // Ignore parsing errors while user is typing
       }
     }
@@ -137,22 +138,22 @@ export default function NewProformaPage() {
         form.setValue('clientAddress', client.address || '');
         form.setValue('clientTaxId', client.taxId || '');
         form.setValue('customerSignatoryName', client.companyName || client.name);
-        
+
         form.setValue('shipToClientId', client.id);
         form.setValue('shipToName', client.companyName || client.name);
         form.setValue('shipToAddress', client.address || '');
         form.setValue('shipToTaxId', client.taxId || '');
       }
     } else {
-        form.setValue('clientAddress', '');
-        form.setValue('clientTaxId', '');
-        form.setValue('customerSignatoryName', '');
-        form.setValue('shipToName', '');
-        form.setValue('shipToAddress', '');
-        form.setValue('shipToTaxId', '');
+      form.setValue('clientAddress', '');
+      form.setValue('clientTaxId', '');
+      form.setValue('customerSignatoryName', '');
+      form.setValue('shipToName', '');
+      form.setValue('shipToAddress', '');
+      form.setValue('shipToTaxId', '');
     }
   }, [watchedClientId, form, clients]);
-  
+
   useEffect(() => {
     if (watchedShipToClientId && clients && watchedShipToClientId !== watchedClientId) {
       const client = clients.find(c => c.id === watchedShipToClientId);
@@ -162,12 +163,12 @@ export default function NewProformaPage() {
         form.setValue('shipToTaxId', client.taxId || '');
       }
     } else if (watchedClientId && clients) {
-        const client = clients.find(c => c.id === watchedClientId);
-        if (client) {
-            form.setValue('shipToName', client.companyName || client.name);
-            form.setValue('shipToAddress', client.address || '');
-            form.setValue('shipToTaxId', client.taxId || '');
-        }
+      const client = clients.find(c => c.id === watchedClientId);
+      if (client) {
+        form.setValue('shipToName', client.companyName || client.name);
+        form.setValue('shipToAddress', client.address || '');
+        form.setValue('shipToTaxId', client.taxId || '');
+      }
     }
   }, [watchedShipToClientId, watchedClientId, form, clients]);
 
@@ -177,24 +178,24 @@ export default function NewProformaPage() {
     const client = clients.find(c => c.id === data.clientId);
 
     const newProformaData: Omit<Proforma, 'id'> = {
-        ...data,
-        clientName: client?.companyName || client?.name || 'Unknown Client',
-        subTotal: subTotal,
-        taxAmount: taxAmount,
-        grandTotal: grandTotal,
-        status: 'DRAFT',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        payments: [],
+      ...data,
+      clientName: client?.companyName || client?.name || 'Unknown Client',
+      subTotal: subTotal,
+      taxAmount: taxAmount,
+      grandTotal: grandTotal,
+      status: 'DRAFT',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      payments: [],
     };
-    
+
     try {
       const docRef = await addProformaMutation.mutateAsync(newProformaData);
       toast({
         title: "Proforma Created",
         description: `Proforma ${data.proformaNumber} for ${client?.name} has been successfully created.`,
       });
-      router.push(`/proformas/${docRef.id}`); 
+      router.push(`/proformas/${docRef.id}`);
     } catch (error) {
       toast({
         title: "Error Creating Proforma",
@@ -217,7 +218,7 @@ export default function NewProformaPage() {
         description: selectedProductToAdd.description,
         totalPrice: quantity * unitPrice,
       });
-      setSelectedProductToAdd(null); 
+      setSelectedProductToAdd(null);
     }
   };
 
@@ -240,12 +241,12 @@ export default function NewProformaPage() {
 
   if (isLoading) {
     return (
-       <div>
+      <div>
         <PageHeader title="Loading..." />
         <div className="space-y-6">
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
       </div>
     );
@@ -254,8 +255,18 @@ export default function NewProformaPage() {
   return (
     <div>
       <PageHeader title="Create New Proforma" description="Fill in the details to generate a new proforma." />
+
+      <div className="flex items-center justify-between mb-6">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver
+        </Button>
+      </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Company &amp; Basic Information</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -266,8 +277,8 @@ export default function NewProformaPage() {
                 control={form.control}
                 render={({ field }) => (
                   <Select onValueChange={(value) => {
-                      field.onChange(value);
-                      form.setValue('clientId', '');
+                    field.onChange(value);
+                    form.setValue('clientId', '');
                   }} defaultValue={field.value}>
                     <SelectTrigger id="company">
                       <SelectValue placeholder="Select a company" />
@@ -285,7 +296,7 @@ export default function NewProformaPage() {
               <Input id="issuedDate" type="date" {...form.register('issuedDate')} />
               {form.formState.errors.issuedDate && <p className="text-sm text-destructive mt-1">{form.formState.errors.issuedDate.message}</p>}
             </div>
-             <div>
+            <div>
               <Label htmlFor="proformaNumber">Proforma Number</Label>
               <Input id="proformaNumber" {...form.register('proformaNumber')} />
               {form.formState.errors.proformaNumber && <p className="text-sm text-destructive mt-1">{form.formState.errors.proformaNumber.message}</p>}
@@ -294,7 +305,7 @@ export default function NewProformaPage() {
               <Label htmlFor="expiryDate">Expiry Date (Optional)</Label>
               <Input id="expiryDate" type="date" {...form.register('expiryDate')} />
             </div>
-             <div>
+            <div>
               <Label htmlFor="currency">Currency</Label>
               <Input id="currency" {...form.register('currency')} />
               {form.formState.errors.currency && <p className="text-sm text-destructive mt-1">{form.formState.errors.currency.message}</p>}
@@ -302,9 +313,9 @@ export default function NewProformaPage() {
             <div>
               <Label htmlFor="taxRate">Tax Rate (e.g., 0.05 for 5%)</Label>
               <Input id="taxRate" type="number" step="0.01" {...form.register('taxRate', { valueAsNumber: true })} />
-               {form.formState.errors.taxRate && <p className="text-sm text-destructive mt-1">{form.formState.errors.taxRate.message}</p>}
+              {form.formState.errors.taxRate && <p className="text-sm text-destructive mt-1">{form.formState.errors.taxRate.message}</p>}
             </div>
-             <div>
+            <div>
               <Label htmlFor="reference">Reference (e.g. PO Number)</Label>
               <Input id="reference" {...form.register('reference')} />
             </div>
@@ -334,21 +345,21 @@ export default function NewProformaPage() {
               />
               {form.formState.errors.clientId && <p className="text-sm text-destructive mt-1">{form.formState.errors.clientId.message}</p>}
             </div>
-             <div>
+            <div>
               <Label htmlFor="clientTaxId">Client Tax ID</Label>
               <Input id="clientTaxId" {...form.register('clientTaxId')} />
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="clientAddress">Client Address</Label>
-              <Textarea id="clientAddress" {...form.register('clientAddress')} placeholder="Client full address"/>
+              <Textarea id="clientAddress" {...form.register('clientAddress')} placeholder="Client full address" />
             </div>
-             <div className="md:col-span-2">
-                <Label htmlFor="customerSignatoryName">Customer Signatory Name (for document footer)</Label>
-                <Input id="customerSignatoryName" {...form.register('customerSignatoryName')} />
+            <div className="md:col-span-2">
+              <Label htmlFor="customerSignatoryName">Customer Signatory Name (for document footer)</Label>
+              <Input id="customerSignatoryName" {...form.register('customerSignatoryName')} />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Shipping Details (Ship To)</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -381,7 +392,7 @@ export default function NewProformaPage() {
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="shipToAddress">Ship To Address</Label>
-              <Textarea id="shipToAddress" {...form.register('shipToAddress')} placeholder="Shipping full address"/>
+              <Textarea id="shipToAddress" {...form.register('shipToAddress')} placeholder="Shipping full address" />
             </div>
           </CardContent>
         </Card>
@@ -406,7 +417,7 @@ export default function NewProformaPage() {
             </div>
             <div>
               <Label htmlFor="portOfArrival">Port of Arrival</Label>
-               <Controller
+              <Controller
                 name="portOfArrival"
                 control={form.control}
                 render={({ field }) => (
@@ -448,7 +459,7 @@ export default function NewProformaPage() {
             <div className="flex items-end gap-4 mb-4">
               <div className="flex-grow">
                 <Label htmlFor="productToAdd">Select Product to Add</Label>
-                 <Select onValueChange={(productId) => setSelectedProductToAdd(products?.find(p => p.id === productId) || null)}>
+                <Select onValueChange={(productId) => setSelectedProductToAdd(products?.find(p => p.id === productId) || null)}>
                   <SelectTrigger id="productToAdd">
                     <SelectValue placeholder="Choose a product" />
                   </SelectTrigger>
@@ -464,7 +475,7 @@ export default function NewProformaPage() {
               </Button>
             </div>
             {form.formState.errors.items && typeof form.formState.errors.items === 'object' && !Array.isArray(form.formState.errors.items) && <p className="text-sm text-destructive mb-2">{form.formState.errors.items.message}</p>}
-            
+
             {fields.length > 0 && (
               <Table>
                 <TableHeader>
@@ -486,32 +497,32 @@ export default function NewProformaPage() {
                       <TableRow key={field.id}>
                         <TableCell>{item.productName}</TableCell>
                         <TableCell>
-                            <Textarea 
-                                {...form.register(`items.${index}.description`)} 
-                                rows={2}
-                                placeholder="Item specific description"
-                            />
+                          <Textarea
+                            {...form.register(`items.${index}.description`)}
+                            rows={2}
+                            placeholder="Item specific description"
+                          />
                         </TableCell>
                         <TableCell>
-                            <Input
-                                type="number"
-                                step="any"
-                                {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
-                                onBlur={() => handleItemValueChange(index)}
-                                className="w-24"
-                            />
-                           {form.formState.errors.items?.[index]?.quantity && <p className="text-sm text-destructive mt-1">{form.formState.errors.items?.[index]?.quantity?.message}</p>}
+                          <Input
+                            type="number"
+                            step="any"
+                            {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
+                            onBlur={() => handleItemValueChange(index)}
+                            className="w-24"
+                          />
+                          {form.formState.errors.items?.[index]?.quantity && <p className="text-sm text-destructive mt-1">{form.formState.errors.items?.[index]?.quantity?.message}</p>}
                         </TableCell>
                         <TableCell>{item.unit}</TableCell>
-                         <TableCell>
-                            <Input
-                                type="number"
-                                step="any"
-                                {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
-                                onBlur={() => handleItemValueChange(index)}
-                                className="w-24"
-                            />
-                             {form.formState.errors.items?.[index]?.unitPrice && <p className="text-sm text-destructive mt-1">{form.formState.errors.items?.[index]?.unitPrice?.message}</p>}
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="any"
+                            {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
+                            onBlur={() => handleItemValueChange(index)}
+                            className="w-24"
+                          />
+                          {form.formState.errors.items?.[index]?.unitPrice && <p className="text-sm text-destructive mt-1">{form.formState.errors.items?.[index]?.unitPrice?.message}</p>}
                         </TableCell>
                         <TableCell>${(Number(watchedItems[index]?.quantity || 0) * Number(watchedItems[index]?.unitPrice || 0)).toFixed(2)}</TableCell>
                         <TableCell>
@@ -529,21 +540,21 @@ export default function NewProformaPage() {
         </Card>
 
         <Card className="shadow-lg">
-            <CardHeader><CardTitle>Summary &amp; Notes</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-                 <div>
-                    <h3 className="text-lg font-semibold">Totals</h3>
-                    <div className="space-y-1 mt-2 text-sm">
-                        <p>Subtotal: <span className="font-medium">${subTotal.toFixed(2)}</span></p>
-                        <p>Tax ({ (watchedTaxRate * 100).toFixed(0) }%): <span className="font-medium">${taxAmount.toFixed(2)}</span></p>
-                        <p className="text-lg font-bold">Grand Total: <span className="text-primary">${grandTotal.toFixed(2)}</span></p>
-                    </div>
-                </div>
-                <div>
-                    <Label htmlFor="notes">Notes (Optional - for large box in document)</Label>
-                    <Textarea id="notes" {...form.register('notes')} placeholder="Any additional notes for the client, terms, conditions etc." rows={5} />
-                </div>
-            </CardContent>
+          <CardHeader><CardTitle>Summary &amp; Notes</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Totals</h3>
+              <div className="space-y-1 mt-2 text-sm">
+                <p>Subtotal: <span className="font-medium">${subTotal.toFixed(2)}</span></p>
+                <p>Tax ({(watchedTaxRate * 100).toFixed(0)}%): <span className="font-medium">${taxAmount.toFixed(2)}</span></p>
+                <p className="text-lg font-bold">Grand Total: <span className="text-primary">${grandTotal.toFixed(2)}</span></p>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="notes">Notes (Optional - for large box in document)</Label>
+              <Textarea id="notes" {...form.register('notes')} placeholder="Any additional notes for the client, terms, conditions etc." rows={5} />
+            </div>
+          </CardContent>
         </Card>
 
         <div className="flex justify-end">
